@@ -14,14 +14,10 @@ const pg = require('pg');
 
 // Initialise postgres client
 const config = {
-  user: 'ck',
+  user: 'root',
   host: '127.0.0.1',
   database: 'pokemons',
   port: 5432,
-};
-
-if (config.user === 'ck') {
-	throw new Error("====== UPDATE YOUR DATABASE CONFIGURATION =======");
 };
 
 const pool = new pg.Pool(config);
@@ -150,6 +146,63 @@ const deletePokemonForm = (request, response) => {
 const deletePokemon = (request, response) => {
   response.send("COMPLETE ME");
 }
+
+const loginPokemon = (req, response) => {
+  response.render('Login');
+}
+
+const newUser = (req,response) => {
+  let passwordHash = sha256(request.body.password)
+
+  const queryString = 'INSERT INTO users(email, password) VALUES($1, $2)'
+  const values = [request.body.email, passwordHash];
+
+  pool.query(queryString, values (err,result)){
+    if (err) {
+          console.error('Query error:', err.stack);
+      } else {
+          console.log('Query result:', result);
+          response.redirect('/login');
+
+  }
+
+}
+const loggedIn = (req,response) => {
+  let passwordHash = sha256(request.body.password);
+
+  const queryString = 'SELECT * FROM users WHERE email = $1';
+  const values = [request.body.email];
+
+  pool.query(queryString, values, (err, result) => {
+    if (err) {
+        console.error('Query error:', err.stack);
+    } else {
+        if (passwordHash === result.rows[0].password) {
+            let login = 'true';
+            let userId = result.rows[0].id;
+
+            response.cookie('login', login);
+            response.cookie('userId', userId);
+
+            response.redirect('/');
+        } else {
+            response.status(401).send('User Invalid');
+        }
+    }
+  })
+}
+
+const logOut = (req, response) => {
+  if (req.cookies['login'] !== 'true') {
+    response.redirect('/login');
+    return;
+  }
+
+  response.clearCookie('login');
+  response.clearCookie('userId');
+  response.redirect('/');
+}
+
 /**
  * ===================================
  * Routes
@@ -162,8 +215,13 @@ app.get('/pokemon/:id/edit', editPokemonForm);
 app.get('/pokemon/new', getNew);
 app.get('/pokemon/:id', getPokemon);
 app.get('/pokemon/:id/delete', deletePokemonForm);
+app.get('/login', loginPokemon);
+app.get('/new', getNew)
+app.get('/logout', logOut)
 
+app.post('/new', newUser)
 app.post('/pokemon', postPokemon);
+app.post('/login', loggedIn)
 
 app.put('/pokemon/:id', updatePokemon);
 
